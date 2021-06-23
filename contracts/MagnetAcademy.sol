@@ -3,10 +3,10 @@
 pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/utils/Counters.sol";
-import "@openzeppelin/contracts/access/AccessControl.sol";
+import "@openzeppelin/contracts/access/AccessControlEnumerable.sol";
 import "./SchoolMagnet.sol";
 
-contract MagnetAcademy is AccessControl {
+contract MagnetAcademy is AccessControlEnumerable {
     using Counters for Counters.Counter;
 
     /**
@@ -14,6 +14,8 @@ contract MagnetAcademy is AccessControl {
      * but we could set the RECTOR_ROLE as the DEFAULT_ADMIN_ROLE.
      * Instead we set the RECTOR_ROLE as the administrator of the ADMIN_ROLE witch mean the rector can grant
      * and revoke admins
+     *
+     * @dev Severals role has admin role?
      * */
     bytes32 private constant _RECTOR_ROLE = keccak256("RECTOR_ROLE");
     bytes32 private constant _ADMIN_ROLE = keccak256("ADMIN_ROLE");
@@ -118,7 +120,20 @@ contract MagnetAcademy is AccessControl {
 
     /**
      * @notice to see which address has which role we implement a new contract: AccessControlEnumerable.sol
+     * But we don't need to set up a view function as it already definined in the ACE.sol
+     *
+     * But we need to have the byteCode of the role, so we set up getter to perform this
+     *
+     * @dev the function could be restricted to pure but this is a getter...
      * */
+
+    function rectorRole() public view returns (bytes32) {
+        return _RECTOR_ROLE;
+    }
+
+    function adminRole() public view returns (bytes32) {
+        return _ADMIN_ROLE;
+    }
 
     function nbSchools() public view returns (uint256) {
         return _nbSchools.current();
@@ -130,10 +145,6 @@ contract MagnetAcademy is AccessControl {
 
     function directorOf(address school) public view returns (address) {
         return _schools[school];
-    }
-
-    function rector() public view returns (bytes32) {
-        return getRoleAdmin(DEFAULT_ADMIN_ROLE);
     }
 
     function isDirector(address account) public view returns (bool) {
