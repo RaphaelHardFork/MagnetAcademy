@@ -3,14 +3,22 @@
 pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/utils/Counters.sol";
+import "@openzeppelin/contracts/access/AccessControl.sol";
 import "./SchoolMagnet.sol";
 
-contract MagnetAcademy {
+contract MagnetAcademy is AccessControl {
     using Counters for Counters.Counter;
 
-    address private _rector;
+    /**
+     * @notice set up storage variable for roles with AccessControl. Here we don't use the DEFAULT_ADMIN_ROLE
+     * but we could set the RECTOR_ROLE as the DEFAULT_ADMIN_ROLE.
+     * Instead we set the RECTOR_ROLE as the administrator of the ADMIN_ROLE witch mean the rector can grant
+     * and revoke admins
+     * */
+    bytes32 private constant _RECTOR_ROLE = keccak256("RECTOR_ROLE");
+    bytes32 private constant _ADMIN_ROLE = keccak256("ADMIN_ROLE");
+
     Counters.Counter private _nbSchools;
-    mapping(address => bool) private _admins;
     mapping(address => address) private _schoolDirectors; // director to school
     mapping(address => address) private _schools; // school to director
 
@@ -20,13 +28,12 @@ contract MagnetAcademy {
     event SchoolDeleted(address indexed schoolAddress, address indexed directorAddress);
     event DirectorSet(address indexed directorAddress, address indexed schoolAddress);
 
-    modifier OnlyRector() {
-        require(msg.sender == _rector, "MagnetAcademy: Only rector can perform this action");
-        _;
-    }
-
+    /**
+     * @notice the modifier "OnlyRector" can be romoved because it was only used to set up admin role
+     * The modifier "OnlyAdmin" is changed, it use now the function provided by AccessControl
+     * */
     modifier OnlyAdmin() {
-        require(_admins[msg.sender] == true, "MagnetAcademy: Only administrators can perform this action");
+        require(hasRole(_ADMIN_ROLE, msg.sender), "MagnetAcademy: Only administrators can perform this action");
         _;
     }
 
@@ -45,18 +52,28 @@ contract MagnetAcademy {
         _;
     }
 
+    /**
+     * @notice the role is set in the constructor as before the utilisation of AccessControl
+     * In the constructor the RECTOR_ROLE is set has the admin role of ADMIN_ROLE witch mean
+     * the RECTOR_ROLE can grant and revoke ADMIN_ROLE
+     * */
     constructor(address rector_) {
-        _rector = rector_;
-        _admins[rector_] = true;
+        _setupRole(_RECTOR_ROLE, rector_);
+        _setupRole(_ADMIN_ROLE, rector_);
+        _setRoleAdmin(_ADMIN_ROLE, _RECTOR_ROLE);
     }
 
-    function addAdmin(address account) public OnlyRector() {
-        _admins[account] = true;
+    /**
+     * @notice the former modifier "OnlyRector" is removed since the RECTOR_ROLE is set to the admin of ADMIN_ROLE
+     * is attribued to the rector. And only this latter can call the grant and the revoke role function.
+     * */
+    function addAdmin(address account) public {
+        grantRole(_ADMIN_ROLE, account);
         emit AdminAdded(account);
     }
 
-    function revokeAdmin(address account) public OnlyRector() {
-        _admins[account] = false;
+    function revokeAdmin(address account) public {
+        revokeRole(_ADMIN_ROLE, account);
         emit AdminRevoked(account);
     }
 
@@ -99,6 +116,10 @@ contract MagnetAcademy {
         return true;
     }
 
+    /**
+     * @notice to see which address has which role we implement a new contract: AccessControlEnumerable.sol
+     * */
+
     function nbSchools() public view returns (uint256) {
         return _nbSchools.current();
     }
@@ -111,12 +132,8 @@ contract MagnetAcademy {
         return _schools[school];
     }
 
-    function rector() public view returns (address) {
-        return _rector;
-    }
-
-    function isAdmin(address account) public view returns (bool) {
-        return _admins[account];
+    function rector() public view returns (bytes32) {
+        return getRoleAdmin(DEFAULT_ADMIN_ROLE);
     }
 
     function isDirector(address account) public view returns (bool) {
